@@ -1,61 +1,22 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
-
-export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+// Solmara Nights — central tuning and city layout constants.
+export const WORLD_W = 3600;
+export const WORLD_H = 2600;
+export const ROAD_W = 96;
+export const BLOCK = 400;
+// Vertical road centre lines (x) and horizontal road centre lines (y).
+export const ROADS_X = [300, 700, 1100, 1500, 1900, 2300, 2700, 3100];
+export const ROADS_Y = [250, 600, 950, 1300, 1650, 2000];
+export const BEACH_Y = 2220; // sand starts here
+export const SEA_Y = 2440;   // water starts here
+export const COLORS = {
+  grass: '#5da24a', grass2: '#548f42', sand: '#e8d29a', sea: '#2f7fb8', sea2: '#2a6ea6',
+  road: '#3a3f4a', roadLine: '#e8d44d', sidewalk: '#9aa0a8', buildingRoof: '#7d6a5f',
+  park: '#3f8f3a', plaza: '#b9b3a4',
 };
-
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
-};
-
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
-};
-
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
-};
-
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+export const CAR_COLORS = ['#d33a2c', '#2c6fd3', '#e8b73a', '#e8e8e8', '#222831', '#3aa655', '#8e44ad', '#e67e22', '#16a0a0'];
+export const PED_SHIRTS = ['#e74c3c', '#3498db', '#f1c40f', '#9b59b6', '#1abc9c', '#e67e22', '#ecf0f1', '#fd79a8'];
+export const MISSION_NAMES = ['First Fare', 'Hot Wheels', 'Heat', 'The Drop'];
+export const SAVE_KEY = 'solmara-nights-save-v1';
+export function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+export function dist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return Math.hypot(dx, dy); }
+export function angDiff(a, b) { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
