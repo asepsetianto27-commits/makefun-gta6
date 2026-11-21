@@ -1,25 +1,41 @@
-// localStorage save / load for Solmara Nights.
-import { SAVE_KEY } from './config.js';
+// Solmara Nights — save system (localStorage): cash, story progress,
+// health, pistol, position and clock. Continue appears on the start screen.
 
-export function saveGame(game) {
+function saveGame() {
+  if (!G) return;
   try {
     const data = {
-      cash: game.player.cash, missionIndex: game.missions.index,
-      completed: game.missions.completed,
-      x: game.player.x, y: game.player.y, health: game.player.health,
-      hasGun: game.player.hasGun, clock: game.clock, reputation: game.reputation,
+      cash: Math.round(G.cash),
+      missionIndex: G.missionIndex,
+      health: Math.round(G.player.health),
+      hasPistol: G.hasPistol,
+      x: Math.round(G.player.x),
+      y: Math.round(G.player.y),
+      clockMin: Math.round(G.clockMin),
+      wanted: G.wanted,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    return true;
-  } catch (e) { return false; }
+  } catch (err) {
+    // Private mode or no storage: the game still plays, it just won't save.
+  }
 }
-export function loadGame() {
+
+function loadSaveData() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) { return null; }
+    const data = JSON.parse(raw);
+    if (typeof data.cash !== 'number') return null;
+    return data;
+  } catch (err) {
+    return null;
+  }
 }
-export function hasSave() {
-  try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+
+function hasSave() {
+  return loadSaveData() !== null;
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
 }

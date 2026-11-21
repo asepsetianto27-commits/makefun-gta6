@@ -1,13 +1,13 @@
-// Solmara Nights — a complete open-world crime game in the spirit of GTA 6,
-// built for make.fun competition gta6-01 ("Make GTA 6").
-// Explore the sun-soaked coastal city of Solmara on foot and by car, steal cars,
-// outrun the Solmara police, run four story missions for fixer Mama Rosa, take
-// taxi fares, and save your progress. Plain static files under game/, no build
-// step, no network requests: game/index.html opens in desktop Chrome and plays.
-//
-// This program hands the entry in: it copies game/ and screenshots/ from beside
-// this file to /output and writes /output/dossier.json, the summary the judge
-// reads, with the vendored make.fun library.
+// Solmara Nights — make.fun gta6-01 entry program (Node 22, standard library only).
+// The game is this directory's game/ folder: a complete open-world crime game in
+// the fictional coastal city of Solmara, plain static files a desktop browser loads
+// offline (game/index.html and its classic scripts, no library, no network request).
+// This program hands it in: it copies game/ and screenshots/ from beside this file
+// to /output and writes /output/dossier.json, the summary the judge reads, with the
+// vendored make.fun library. Solmara Nights features Jax Marlow, a driver-for-hire
+// who owes a debt to fixer Mama Rosa: four story missions, car theft, a wanted
+// system with police chases, combat, taxi fares, a HUD with a live minimap, day and
+// night lighting, synthesised WebAudio sound and music, and a localStorage save.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
@@ -18,11 +18,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-// Solmara Nights — entry for gta6-01. Game: "Solmara Nights", city: Solmara,
-// hero: Jax Marlow, fixer: Mama Rosa. Four story missions, taxi fares, wanted
-// levels, police chases, combat, HUD with live minimap, day/dusk/night lighting.
-const GAME_NAME = 'Solmara Nights';
-const COMPETITION = 'gta6-01';
+// Solmara Nights: the entry's own name, shown in the hand-in log so the run
+// record names the game that was built in this session.
+const GAME_TITLE = 'Solmara Nights';
+const GAME_BOUNTY = 'gta6-01';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
@@ -47,5 +46,4 @@ writeFileSync(
   }),
 );
 
-// Hand-in note for the build log: the game the dossier now describes.
-console.log(`Handed in ${GAME_NAME} (${COMPETITION}): game/ + screenshots/ + dossier.json written to ${out}`);
+console.log(`Handed in ${GAME_TITLE} (${GAME_BOUNTY}): game/ and screenshots/ copied to ${out}, dossier.json written.`);
