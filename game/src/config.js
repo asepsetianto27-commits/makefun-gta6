@@ -1,80 +1,79 @@
-// Solmara Nights — configuration and shared constants.
-// A complete open-world crime game in the fictional coastal city of Solmara.
-// All names, places, characters and story are original.
+// Solmara Nights — central tuning and world constants.
+// One clear job: every number the rest of the game shares lives here.
+export const WORLD_W = 3200;
+export const WORLD_H = 2400;
+export const ROAD_W = 96;
+export const BLOCK = 400;
 
-const WORLD_W = 3600;
-const WORLD_H = 2600;
-const ROAD_W = 96;
-const ROAD_XS = [400, 900, 1400, 1900, 2400, 2900];
-const ROAD_YS = [350, 800, 1250, 1700, 2150];
-const BEACH_X = 320; // sand starts west of this line
-const WATER_X = 130; // sea west of this line
-const SAVE_KEY = 'solmara-nights-save-v1';
-const GAME_NAME = 'Solmara Nights';
-const GAME_TAGLINE = 'A complete open-world crime game — explore Solmara on foot and by car, steal cars, outrun the police, run story missions. Built for the make.fun "Make GTA 6" bounty (gta6-01).';
+// Vertical roads (x centres) and horizontal roads (y centres) of Solmara.
+export const VERTICAL_ROADS = [340, 740, 1140, 1540, 1940, 2340, 2740];
+export const HORIZONTAL_ROADS = [320, 720, 1120, 1520, 1920, 2220];
 
-const PALETTE = {
-  grass: '#5d9b4a',
-  grassDark: '#4c8340',
+// Coast on the west edge, river on the east edge with one bridge road.
+export const WATER_WEST = 150;
+export const SAND_WEST = 300;
+export const RIVER_EAST = 2980;
+
+export const COLORS = {
+  grass: '#7fae5a',
+  grassDark: '#74a24f',
   sand: '#e8d39a',
-  water: '#2f7fb8',
-  waterDeep: '#1f5f92',
-  asphalt: '#3a3a40',
-  asphaltLight: '#46464d',
-  sidewalk: '#9a9a92',
+  water: '#2e7fa8',
+  waterDeep: '#256b8f',
+  road: '#3a3d42',
+  roadEdge: '#2c2f33',
   lane: '#e8d44d',
-  park: '#3f7d33',
-  buildingRoof: ['#b0563a', '#7a6a8a', '#4a7a9b', '#9b7a4a', '#6a8a5a', '#8a4a5a', '#5a5a6e', '#a8875a'],
-  buildingWall: '#c9b8a3',
+  sidewalk: '#b9b3a4',
+  park: '#5d9b4a',
+  buildingRoof: ['#c96f4a', '#7d8aa0', '#b5a06a', '#8a6f9e', '#5f8a6d', '#a85d5d'],
+  buildingWall: '#6b5a49',
 };
 
-const CAR_COLORS = ['#c0392b', '#2471a3', '#f1c40f', '#7d3c98', '#16a085', '#e67e22', '#ecf0f1', '#2c3e50', '#d35400'];
-const PED_COLORS = ['#e74c3c', '#3498db', '#f39c12', '#9b59b6', '#1abc9c', '#fd79a8', '#fdcb6e', '#6c5ce7', '#00b894'];
+export const PLAYER_START = { x: 740, y: 1120 };
+export const PISTOL_PICKUP = { x: 800, y: 1060 };
 
-const MISSIONS = [
+export const MISSION_DEFS = [
   {
-    id: 0, name: 'First Fare', reward: 250,
-    brief: 'Mama Rosa needs a driver. Pick up her client and get him across town before the clock runs out.',
-    dialogue: [
-      ['Mama Rosa', 'Jax, sayang. You owe me, remember? Drive my client to Palm Plaza. Fast, but not dead.'],
-      ['Jax Marlow', 'One fare. Then we talk about my debt, Rosa.'],
-      ['Mama Rosa', 'Drive first. Talk later. The meter is running.'],
-    ],
+    id: 1,
+    title: 'First Fare',
+    giver: 'Mama Rosa',
+    briefing: 'Jax, you owe me. Drive my client across town before the clock runs out. Do not scratch the paint.',
+    objective: 'Drive the client to the drop-off',
+    timeLimit: 100,
   },
   {
-    id: 1, name: 'Hot Wheels', reward: 400,
-    brief: 'A yellow Comet GT is parked at the marina. Steal it and deliver it to Rosa\u2019s garage. No scratches. Well — few scratches.',
-    dialogue: [
-      ['Mama Rosa', 'There is a yellow Comet GT at the marina. It has an owner. Soon it will have a new owner. Us.'],
-      ['Jax Marlow', 'Stealing cars now? My debt must be bigger than I thought.'],
-      ['Mama Rosa', 'Bring it to my garage. The gate is open. Do not bring the police.'],
-    ],
+    id: 2,
+    title: 'Hot Wheels',
+    giver: 'Mama Rosa',
+    briefing: 'A red Comet sportscar is parked by the marina. Take it. Bring it to my garage, no police.',
+    objective: 'Steal the red Comet and deliver it to the garage',
+    timeLimit: 150,
   },
   {
-    id: 2, name: 'Heat', reward: 600,
-    brief: 'The Solmara police are all over you — 3 stars. Survive the chase, then lose them and let the heat die down.',
-    dialogue: [
-      ['Mama Rosa', 'Jax! The whole city is looking for you. Three stars! Lay low until they forget your face.'],
-      ['Jax Marlow', 'Forgetting my face is my favourite hobby. Give me a minute.'],
-    ],
+    id: 3,
+    title: 'Heat',
+    giver: 'Mama Rosa',
+    briefing: 'The cops are onto you, three stars. Survive and shake them off. Hide until the heat dies.',
+    objective: 'Lose the 3-star wanted level',
+    timeLimit: 90,
   },
   {
-    id: 3, name: 'The Drop', reward: 900,
-    brief: 'Pick up the package at the pier and deliver it to the harbor warehouse while the police chase you. This one clears your debt.',
-    dialogue: [
-      ['Mama Rosa', 'Last job, Jax. A package at the pier, a warehouse at the harbor. The police will be close. So be closer to the finish.'],
-      ['Jax Marlow', 'After this, Rosa, we are even. I am driving into the sunset — or the sea.'],
-      ['Mama Rosa', 'Sunset, sayang. The sea is for the fish.'],
-    ],
+    id: 4,
+    title: 'The Drop',
+    giver: 'Mama Rosa',
+    briefing: 'Last job. Carry this package across the city while the police chase you. Then your debt is gone.',
+    objective: 'Deliver the package across the city',
+    timeLimit: 150,
   },
 ];
 
-const ENDING_LINES = [
-  'Jax delivered the package as the sun went down over Solmara Bay.',
-  'Mama Rosa tore up his debt in front of the whole garage.',
-  'The city was still his — every street, every car, every fare.',
-  'SOLMARA NIGHTS — thanks for playing. Free roam continues: fares, chases and the open city are yours.',
+export const ENDING_TEXT = [
+  'SOLMARA NIGHTS — THE END',
+  'Jax delivered the package as the sun went down over the bay.',
+  'Mama Rosa tore up the debt. Solmara is yours now, Jax.',
+  'Thanks for playing. Keep driving, keep the radio loud.',
 ];
 
-// The live game state. Created by resetGame() in main.js, read by every system.
-let G = null;
+export const SAVE_KEY = 'solmara-nights-save-v1';
+export const GAME_NAME = 'Solmara Nights';
+export const GAME_TAGLINE = 'A sun-soaked open-world crime story in the fictional coastal city of Solmara.';

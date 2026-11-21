@@ -1,211 +1,176 @@
-// Solmara Nights — the 4-mission story, the taxi side activity, dialogue,
-// objectives, markers, timers, rewards and the ending.
+// Solmara Nights — story missions and the taxi side activity.
+// One clear job: the 4-mission story arc, objectives, timers, dialogue and payouts.
+import { MISSION_DEFS } from './config.js';
+import { dist, randRange } from './util.js';
+import { nearestRoadPoint } from './world.js';
+import { showMessage, showDialogue, addFloater, spawnParticles } from './state.js';
+import { makeCar } from './traffic.js';
+import { addWanted } from './police.js';
 
-function say(text, who) {
-  G.dialogue.push({ text, who: who || '', t: 0 });
-  if (G.dialogue.length > 4) G.dialogue.shift();
+export function missionObjective(S) {
+  if (S.mission) return S.mission.objective;
+  if (S.missionIndex >= 4) return 'Solmara is yours. Free roam — take fares, steal cars, stay out of trouble.';
+  return 'Talk to Mama Rosa: press M for the mission list, then start mission ' + (S.missionIndex + 1);
 }
 
-function updateDialogue(dt) {
-  if (!G.dialogue.length) return;
-  G.dialogue[0].t += dt;
-  if (G.dialogue[0].t > 4.2) G.dialogue.shift();
+export function missionMarker(S) {
+  if (!S.mission) return null;
+  return { x: S.mission.tx, y: S.mission.ty, label: S.mission.markerLabel };
 }
 
-function missionMarker() {
-  const m = G.mission;
-  if (!m || m.done) return null;
-  if (m.step === 'getcar') return { x: G.player.x, y: G.player.y, label: 'Get in a car' };
-  if (m.step === 'drive') return { x: m.tx, y: m.ty, label: m.label };
-  if (m.step === 'steal') return { x: m.tx, y: m.ty, label: m.label };
-  if (m.step === 'deliver') return { x: m.tx, y: m.ty, label: m.label };
-  if (m.step === 'pickup') return { x: m.tx, y: m.ty, label: m.label };
-  if (m.step === 'survive') return null;
-  if (m.step === 'hide') return null;
-  return null;
-}
-
-function currentObjective() {
-  const m = G.mission;
-  if (G.taxi.active) {
-    return { text: 'Taxi fare: drop your passenger at the marker', x: G.taxi.tx, y: G.taxi.ty };
+export function startMission(S, index, audio) {
+  const def = MISSION_DEFS[index];
+  if (!def) return false;
+  const w = S.world;
+  const m = { def, index, objective: def.objective, timer: def.timeLimit, stage: 0, tx: 0, ty: 0, markerLabel: '', car: null };
+  if (index === 0) {
+    // Client waits at the kerb; drive them to the north-east drop-off.
+    m.tx = w.clientSpot.x; m.ty = w.clientSpot.y; m.markerLabel = 'CLIENT';
+    m.stage = 0; // 0 = pick up client, 1 = drive to drop-off
+    m.objective = 'Pick up the client at the marker';
+  } else if (index === 1) {
+    // The red Comet waits by the marina.
+    const comet = makeCar(S, w.marina.x + 60, w.marina.y + 30, -Math.PI / 2, {
+      color: '#d21f2b', type: 'sport', driver: 'parked',
+    });
+    comet.hp = 120;
+    m.car = comet;
+    m.tx = comet.x; m.ty = comet.y; m.markerLabel = 'COMET';
+    m.stage = 0; // 0 = steal Comet, 1 = deliver to garage
+    m.objective = 'Steal the red Comet at the marina';
+  } else if (index === 2) {
+    addWanted(S, 3);
+    m.tx = S.player.x; m.ty = S.player.y; m.markerLabel = 'HIDE';
+    m.stage = 0;
+    m.objective = 'Lose the 3-star wanted level — stay out of sight';
+  } else if (index === 3) {
+    S.packageTaken = false;
+    m.tx = w.packageSpot.x; m.ty = w.packageSpot.y; m.markerLabel = 'PACKAGE';
+    m.stage = 0; // 0 = grab package, 1 = deliver across town
+    m.objective = 'Pick up the package at the marker';
   }
-  if (!m || m.done) {
-    return { text: G.missionIndex >= MISSIONS.length ? 'Free roam — fares, chases and the open city are yours' : 'Press M for the mission list', x: null, y: null };
-  }
-  const mk = missionMarker();
-  const texts = {
-    getcar: 'Get in a car',
-    drive: 'Drive the client to Palm Plaza — beat the clock!',
-    steal: 'Steal the yellow Comet GT at the marina',
-    deliver: 'Deliver the car to Rosa\u2019s Garage',
-    pickup: 'Pick up the package at Solmara Pier',
-    survive: 'Survive the heat — 3 stars on you!',
-    hide: 'Lose the cops — let your wanted level fall to zero',
-  };
-  return { text: texts[m.step] || m.name, x: mk ? mk.x : null, y: mk ? mk.y : null };
+  S.mission = m;
+  S.missionTimer = def.timeLimit;
+  showDialogue(S, ['MAMA ROSA: ' + def.briefing, def.title + ' — ' + def.objective], 6);
+  showMessage(S, 'Mission started: ' + def.title, 3);
+  if (audio) audio.blip(660, 0.15, 'triangle', 0.12);
+  return true;
 }
 
-function startMission(i) {
-  const def = MISSIONS[i];
-  if (!def) return;
-  G.missionIndex = i;
-  const m = { def, index: i, name: def.name, step: 'getcar', tx: 0, ty: 0, label: '', timer: 0, done: false };
-  if (i === 0) {
-    m.step = 'getcar';
-    m.tx = G.world.plaza.x; m.ty = G.world.plaza.y;
-    m.label = 'Palm Plaza';
-    m.timer = 110;
-  } else if (i === 1) {
-    m.step = 'steal';
-    m.tx = G.world.marina.x; m.ty = G.world.marina.y;
-    m.label = 'Steal the Comet GT';
-    m.targetCar = makeCar(G.world.marina.x + 60, G.world.marina.y + 30, 0, 'parked', 'sport', '#f1c40f');
-    // Keep the target car out of any building so it is always reachable.
-    let guard = 0;
-    while (guard++ < 40 && G.world.buildings.some((b) => pointInRect(m.targetCar.x, m.targetCar.y, { x: b.x - 26, y: b.y - 26, w: b.w + 52, h: b.h + 52 }))) {
-      m.targetCar.x += 44;
-    }
-    G.cars.push(m.targetCar);
-  } else if (i === 2) {
-    m.step = 'survive';
-    m.timer = 60;
-    G.wanted = 3;
-    G.crimeTimer = 0;
-  } else if (i === 3) {
-    m.step = 'pickup';
-    m.tx = G.world.pier.x; m.ty = G.world.pier.y;
-    m.label = 'Pick up the package';
+function completeMission(S, audio) {
+  const def = S.mission.def;
+  const payout = [300, 500, 400, 800][S.mission.index];
+  S.cash += payout;
+  S.stats.earned += payout;
+  S.reputation += 25;
+  S.missionIndex++;
+  showMessage(S, 'Mission complete: ' + def.title + '  +' + '$' + payout, 4);
+  showDialogue(S, ['MAMA ROSA: Good work, Jax. ' + (S.missionIndex >= 4 ? 'Your debt is gone.' : 'One more job and we are square.'), 'Earned $' + payout], 5);
+  addFloater(S, S.player.x, S.player.y - 30, '+$' + payout, '#7dff8a');
+  if (audio) audio.missionDone();
+  S.mission = null;
+  if (S.missionIndex >= 4) {
+    S.mode = 'done';
+    S.endStats = { cash: S.cash, earned: S.stats.earned, stolen: S.stats.carsStolen, fares: S.stats.faresDone };
+  } else {
+    S.mode = 'missiondone';
   }
-  G.mission = m;
-  def.dialogue.forEach(([who, line]) => say(line, who));
-  saveGame();
 }
 
-function completeMission() {
-  const m = G.mission;
+function failMission(S, reason) {
+  showMessage(S, 'Mission failed: ' + reason + ' — try again (press M).', 4);
+  showDialogue(S, ['MAMA ROSA: ' + reason + ' Come back when you are ready.'], 5);
+  S.mission = null;
+  S.wanted = Math.min(S.wanted, 1);
+}
+
+export function updateMissions(S, dt, audio) {
+  const m = S.mission;
   if (!m) return;
-  G.cash += m.def.reward;
-  AudioSys.missionDone();
-  G.missionComplete = { name: m.def.name, reward: m.def.reward };
-  G.state = 'missionComplete';
-  G.mission = null;
-  G.missionIndex += 1;
-  if (G.missionIndex >= MISSIONS.length) {
-    G.endingShown = true;
+  S.missionTimer -= dt;
+  if (S.missionTimer <= 0) {
+    failMission(S, 'Out of time on "' + m.def.title + '"');
+    return;
   }
-  saveGame();
-}
-
-function failMission(reason) {
-  G.missionFailed = reason || 'Mission failed';
-  G.state = 'missionFailed';
-  AudioSys.busted();
-}
-
-function updateMission(dt) {
-  const m = G.mission;
-  if (!m) return;
-  if (m.step === 'getcar') {
-    if (G.player.car) {
-      if (m.index === 0) {
-        m.step = 'drive';
-        m.tx = G.world.plaza.x; m.ty = G.world.plaza.y; m.label = 'Palm Plaza';
-        say('Client: Palm Plaza, and step on it. I have a boat to catch.', 'Client');
-      } else {
-        m.step = 'drive';
+  const p = S.player;
+  if (m.index === 0) {
+    if (m.stage === 0) {
+      if (dist(p.x, p.y, m.tx, m.ty) < 70) {
+        m.stage = 1;
+        m.tx = S.world.dropoff.x; m.ty = S.world.dropoff.y; m.markerLabel = 'DROP-OFF';
+        m.objective = 'Drive the client to the drop-off — ' + Math.ceil(S.missionTimer) + 's left';
+        showDialogue(S, ['CLIENT: Nice wheels. The north-east corner, fast — I am late.'], 4);
       }
+    } else if (dist(p.x, p.y, m.tx, m.ty) < 80 && p.car) {
+      completeMission(S, audio);
     }
-    return;
-  }
-  if (m.step === 'drive' || m.step === 'deliver' || m.step === 'pickup') {
-    const d = dist(G.player.x, G.player.y, m.tx, m.ty);
-    const radius = (m.step === 'deliver' || m.step === 'pickup') ? 120 : 70;
-    if (m.index === 0) {
-      m.timer -= dt;
-      if (m.timer <= 0) { failMission('Out of time — the client missed his boat.'); return; }
-    }
-    if (d < radius) {
-      if (m.index === 0) { completeMission(); return; }
-      if (m.index === 1 && m.step === 'deliver') { completeMission(); return; }
-      if (m.index === 3 && m.step === 'pickup') {
-        m.step = 'deliver';
-        m.tx = G.world.warehouse.x; m.ty = G.world.warehouse.y; m.label = 'Harbor Warehouse';
-        G.wanted = Math.max(G.wanted, 2);
-        say('Package secured. Now the warehouse — and the whole Solmara PD is awake.', 'Jax Marlow');
-        return;
+  } else if (m.index === 1) {
+    if (m.stage === 0) {
+      if (p.car === m.car) {
+        m.stage = 1;
+        m.tx = S.world.garage.x; m.ty = S.world.garage.y; m.markerLabel = 'GARAGE';
+        m.objective = 'Deliver the Comet to the garage — avoid the police';
+        showDialogue(S, ['MAMA ROSA: That is my car now. Garage, east side. Quietly.'], 4);
       }
-      if (m.index === 3 && m.step === 'deliver') { completeMission(); return; }
+    } else if (dist(p.x, p.y, m.tx, m.ty) < 90 && p.car === m.car) {
+      completeMission(S, audio);
+    }
+  } else if (m.index === 2) {
+    m.objective = 'Lose the wanted level — hide until the stars fade';
+    if (S.wanted === 0) completeMission(S, audio);
+  } else if (m.index === 3) {
+    if (m.stage === 0) {
+      if (dist(p.x, p.y, m.tx, m.ty) < 70) {
+        S.packageTaken = true;
+        m.stage = 1;
+        m.tx = S.world.dropoff.x; m.ty = S.world.dropoff.y; m.markerLabel = 'DROP-OFF';
+        m.objective = 'Deliver the package — the police are on you';
+        addWanted(S, 2);
+        showDialogue(S, ['MAMA ROSA: Package is hot. Do not stop for anyone.'], 4);
+      }
+    } else if (dist(p.x, p.y, m.tx, m.ty) < 80) {
+      completeMission(S, audio);
+    }
+  }
+}
+
+// --- Taxi side activity -------------------------------------------------
+export function updateTaxi(S, dt, audio) {
+  const p = S.player;
+  if (!S.taxi) {
+    S.taxiCooldown -= dt;
+    if (S.taxiCooldown <= 0 && S.mode === 'play') {
+      // A pedestrian flags a cab: a "$" marker appears near the player.
+      const rp = nearestRoadPoint(p.x + randRange(S.rng, -450, 450), p.y + randRange(S.rng, -450, 450));
+      S.taxi = { stage: 'wait', x: rp.x, y: rp.y, tx: 0, ty: 0, fare: 40 + Math.floor(S.rng() * 5) * 10, timer: 60 };
+      showMessage(S, 'Taxi fare nearby — drive to the $ marker and pick up the passenger.', 3);
     }
     return;
   }
-  if (m.step === 'steal') {
-    if (G.player.car === m.targetCar) {
-      m.step = 'deliver';
-      m.tx = G.world.garage.x; m.ty = G.world.garage.y; m.label = "Rosa's Garage";
-      say('Nice. Yellow suits you. Now the garage — easy does it.', 'Mama Rosa');
+  const t = S.taxi;
+  t.timer -= dt;
+  if (t.timer <= 0) {
+    showMessage(S, 'The taxi passenger gave up and walked away.', 2.5);
+    S.taxi = null;
+    S.taxiCooldown = 8;
+    return;
+  }
+  if (t.stage === 'wait') {
+    if (p.car && dist(p.x, p.y, t.x, t.y) < 80) {
+      t.stage = 'ride';
+      const rp = nearestRoadPoint(p.x + randRange(S.rng, -900, 900), p.y + randRange(S.rng, -900, 900));
+      t.tx = rp.x; t.ty = rp.y;
+      t.timer = 75;
+      showDialogue(S, ['PASSENGER: Take me to the marker. Keep the meter running, driver.'], 4);
     }
-    return;
+  } else if (dist(p.x, p.y, t.tx, t.ty) < 80 && p.car) {
+    S.cash += t.fare;
+    S.stats.earned += t.fare;
+    S.stats.faresDone++;
+    addFloater(S, p.x, p.y - 30, '+$' + t.fare + ' fare', '#7dff8a');
+    showMessage(S, 'Fare complete! +$' + t.fare, 3);
+    if (audio) audio.pickup();
+    S.taxi = null;
+    S.taxiCooldown = 10;
   }
-  if (m.step === 'survive') {
-    m.timer -= dt;
-    if (m.timer <= 0) {
-      m.step = 'hide';
-      say('You lived. Now vanish — get that wanted level to zero.', 'Mama Rosa');
-    }
-    return;
-  }
-  if (m.step === 'hide') {
-    if (G.wanted <= 0) completeMission();
-    return;
-  }
-}
-
-// ---- Taxi side activity ----
-
-function maybeSpawnFare(dt) {
-  G.fareT -= dt;
-  if (G.fareT > 0 || G.taxi.active) return;
-  G.fareT = rr(14, 26);
-  const t = randomSidewalkPoint();
-  const ped = spawnPed(t.x, t.y);
-  ped.state = 'fare';
-  G.peds.push(ped);
-  G.taxi.farePed = ped;
-}
-
-function startFareRide(ped) {
-  const dest = randomRoadPoint();
-  G.taxi.active = true;
-  G.taxi.tx = dest.x; G.taxi.ty = dest.y;
-  G.taxi.fare = ri(25, 60);
-  G.taxi.ped = ped;
-  say('Passenger: Take me to the marker, driver. No funny business.', 'Passenger');
-}
-
-function updateTaxi(dt) {
-  if (!G.taxi.active) return;
-  if (!G.player.car) {
-    // Passenger bails if the driver abandons the car.
-    cancelFare('Your passenger gave up and walked away.');
-    return;
-  }
-  const d = dist(G.player.x, G.player.y, G.taxi.tx, G.taxi.ty);
-  if (d < 70) {
-    G.cash += G.taxi.fare;
-    AudioSys.cash();
-    say('Passenger: Keep the change. Five stars, driver.', 'Passenger');
-    spawnParticles(G.player.x, G.player.y, 12, '#7CFC98');
-    if (G.taxi.ped) G.taxi.ped.state = 'gone';
-    G.taxi.active = false;
-    G.taxi.ped = null;
-    saveGame();
-  }
-}
-
-function cancelFare(reason) {
-  if (G.taxi.ped) G.taxi.ped.state = 'walk';
-  G.taxi.active = false;
-  G.taxi.ped = null;
-  if (reason) say(reason, '');
 }

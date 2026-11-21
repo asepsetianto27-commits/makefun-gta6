@@ -1,132 +1,139 @@
-// Solmara Nights — combat: fists on foot, a pistol with mouse aim once picked
-// up, bullets, muzzle flash, and damage to the player, peds and officers.
+// Solmara Nights — combat: fists on foot, a pistol with mouse aim, bullets.
+// One clear job: shooting, punching, bullet flight, and what a hit does.
+import { dist, angleTo, clamp } from './util.js';
+import { collideWorld } from './world.js';
+import { spawnParticles, addFloater } from './state.js';
+import { addWanted, damagePolice } from './police.js';
 
-function updateBullets(dt) {
-  for (const b of G.bullets) {
+export function updateCombat(S, dt, input, audio) {
+  const player = S.player;
+  player.punchCooldown = Math.max(0, player.punchCooldown - dt);
+  player.shootCooldown = Math.max(0, player.shootCooldown - dt);
+  player.invuln = Math.max(0, player.invuln - dt);
+
+  if (player.onFoot && S.mode === 'play') {
+    // Punch with F: a short arc in front of the player.
+    if (input.consume('f') && player.punchCooldown <= 0) {
+      player.punchCooldown = 0.45;
+      const px = player.x + Math.cos(player.angle) * 30;
+      const py = player.y + Math.sin(player.angle) * 30;
+      spawnParticles(S, px, py, 5, '#ffffff', 80);
+      let hitSomething = false;
+      for (const ped of S.peds) {
+        if (ped.state !== 'down' && dist(px, py, ped.x, ped.y) < 34) {
+          ped.state = 'down';
+          ped.down = 3;
+          hitSomething = true;
+          addWanted(S, 1);
+          addFloater(S, ped.x, ped.y - 20, 'WHAM!', '#ffe08a');
+        }
+      }
+      for (const p of [...S.police]) {
+        if (p.kind === 'foot' && dist(px, py, p.x, p.y) < 34) {
+          damagePolice(S, p, 25);
+          hitSomething = true;
+        }
+      }
+      if (hitSomething && audio) audio.blip(140, 0.12, 'square', 0.14);
+    }
+    // Shoot with the mouse once the pistol is picked up.
+    if (player.hasPistol && input.mouseDown && player.shootCooldown <= 0) {
+      player.shootCooldown = 0.22;
+      const cam = S.camera;
+      const wx = cam.x - 640 + input.mouseX;
+      const wy = cam.y - 360 + input.mouseY;
+      const a = angleTo(player.x, player.y, wx, wy);
+      player.angle = a;
+      S.bullets.push({
+        x: player.x + Math.cos(a) * 22, y: player.y + Math.sin(a) * 22,
+        vx: Math.cos(a) * 640, vy: Math.sin(a) * 640, life: 0.9, from: 'player',
+      });
+      S.stats.shotsFired++;
+      S.shake = Math.max(S.shake, 2);
+      spawnParticles(S, player.x + Math.cos(a) * 26, player.y + Math.sin(a) * 26, 5, '#ffe08a', 120);
+      if (audio) audio.gunshot();
+    }
+  }
+
+  // Move bullets and resolve hits.
+  for (const b of S.bullets) {
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.life -= dt;
-    // Hit a building: spark and stop.
-    for (const bd of G.world.buildings) {
-      if (pointInRect(b.x, b.y, bd)) { b.life = 0; spawnParticles(b.x, b.y, 4, '#ffb347'); break; }
+    const hitBuilding = S.world.buildings.some((r) => {
+      return b.x > r.x && b.x < r.x + r.w && b.y > r.y && b.y < r.y + r.h;
+    });
+    if (hitBuilding) {
+      b.life = 0;
+      spawnParticles(S, b.x, b.y, 4, '#c9c9c9', 70);
+      continue;
     }
-    if (b.life <= 0) continue;
-    if (b.hostile) {
-      if (dist(b.x, b.y, G.player.x, G.player.y) < (G.player.car ? 24 : 13)) {
-        b.life = 0;
-        damagePlayer(6, 'shot by police');
+    if (b.from === 'player') {
+      for (const ped of S.peds) {
+        if (ped.state !== 'down' && dist(b.x, b.y, ped.x, ped.y) < 14) {
+          ped.state = 'down';
+          ped.down = 4;
+          b.life = 0;
+          addWanted(S, 1);
+          spawnParticles(S, ped.x, ped.y, 10, '#ff5a5a', 120);
+          break;
+        }
+      }
+      if (b.life <= 0) continue;
+      for (const p of [...S.police]) {
+        const px = p.kind === 'car' ? p.car.x : p.x;
+        const py = p.kind === 'car' ? p.car.y : p.y;
+        if (dist(b.x, b.y, px, py) < 22) {
+          damagePolice(S, p, 34);
+          b.life = 0;
+          spawnParticles(S, px, py, 8, '#ff8a5a', 110);
+          break;
+        }
+      }
+      if (b.life <= 0) continue;
+      for (const car of S.cars) {
+        if (car.driver === 'player') continue;
+        if (dist(b.x, b.y, car.x, car.y) < 24) {
+          car.hp -= 20;
+          b.life = 0;
+          spawnParticles(S, car.x, car.y, 6, '#ffb347', 100);
+          if (car.hp <= 0) {
+            spawnParticles(S, car.x, car.y, 22, '#ff7b2f', 200);
+            car.driver = 'parked';
+            car.speed = 0;
+          }
+          break;
+        }
       }
     } else {
-      for (const ped of G.peds) {
-        if (ped.down > 0 || ped.state === 'riding') continue;
-        if (dist(b.x, b.y, ped.x, ped.y) < 15) {
-          b.life = 0;
-          damagePed(ped, 34);
-          break;
+      // Police bullets hurt the player (or their car).
+      if (dist(b.x, b.y, player.x, player.y) < 16 && player.invuln <= 0) {
+        player.health -= 9;
+        player.invuln = 0.5;
+        b.life = 0;
+        S.shake = Math.max(S.shake, 4);
+        spawnParticles(S, player.x, player.y, 8, '#ff5a5a', 120);
+        if (player.health <= 0) {
+          S.mode = 'wasted';
         }
       }
     }
   }
-  G.bullets = G.bullets.filter((b) => b.life > 0 && b.x > 0 && b.x < WORLD_W && b.y > 0 && b.y < WORLD_H);
+  S.bullets = S.bullets.filter((b) => b.life > 0);
 }
 
-function shootAt(wx, wy) {
-  if (!G.hasPistol || G.state !== 'playing') return;
-  const ox = G.player.x, oy = G.player.y;
-  const a = angleTo(ox, oy, wx, wy) + rr(-0.03, 0.03);
-  G.bullets.push({ x: ox + Math.cos(a) * 20, y: oy + Math.sin(a) * 20, vx: Math.cos(a) * 780, vy: Math.sin(a) * 780, life: 1.0, hostile: false });
-  G.player.aimAngle = a;
-  G.muzzleT = 0.07;
-  spawnParticles(ox + Math.cos(a) * 24, oy + Math.sin(a) * 24, 5, '#ffd76a');
-  AudioSys.gunshot();
-  if (!G.shotCrime) {
-    // Firing a gun in the city draws the law.
-    addWanted(1, 'fired a gun');
-  }
-}
-
-function punch() {
-  if (G.state !== 'playing' || G.player.car) return;
-  const a = G.player.angle;
-  const tx = G.player.x + Math.cos(a) * 40, ty = G.player.y + Math.sin(a) * 40;
-  const ped = nearestPedTo(tx, ty, 46);
-  G.punchT = 0.18;
-  AudioSys.punch();
-  if (ped) {
-    damagePed(ped, 25);
-    const ka = angleTo(G.player.x, G.player.y, ped.x, ped.y);
-    ped.x += Math.cos(ka) * 26; ped.y += Math.sin(ka) * 26;
-    spawnParticles(ped.x, ped.y, 6, '#ffe08a');
-    if (ped.kind === 'officer' || ped.kind === 'civilian') addWanted(1, 'assault');
-  }
-}
-
-function damagePed(ped, n) {
-  ped.hp = (ped.hp === undefined ? 50 : ped.hp) - n;
-  ped.state = 'flee';
-  ped.fleeX = G.player.x; ped.fleeY = G.player.y;
-  ped.scared = 2.5;
-  if (ped.hp <= 0) {
-    ped.down = 4;
-    ped.state = 'walk';
-    if (ped.kind === 'officer') {
-      addWanted(2, 'downed an officer');
-      G.cash = Math.max(0, G.cash);
+// Driving into a pedestrian knocks them down and raises the heat.
+export function checkPedCollisions(S) {
+  const player = S.player;
+  if (!player.car) return;
+  for (const ped of S.peds) {
+    if (ped.state === 'down') continue;
+    if (dist(player.x, player.y, ped.x, ped.y) < 26 && Math.abs(player.car.speed) > 40) {
+      ped.state = 'down';
+      ped.down = 4;
+      addWanted(S, 1);
+      spawnParticles(S, ped.x, ped.y, 12, '#ff5a5a', 130);
+      addFloater(S, ped.x, ped.y - 24, 'You hit a pedestrian! +1 star', '#ff8a8a');
     }
   }
-}
-
-function damagePlayer(n, src) {
-  if (G.state !== 'playing' || G.godT > 0) return;
-  G.player.health -= n;
-  G.hurtT = 0.35;
-  G.godT = 0.4;
-  screenShake(5);
-  if (G.player.health <= 0) {
-    G.player.health = 0;
-    G.state = 'wasted';
-    AudioSys.engine(0, false);
-    AudioSys.busted();
-    saveGame();
-  }
-}
-
-function updatePickups(dt) {
-  for (const pk of G.pickups) {
-    if (pk.taken) continue;
-    pk.bob += dt;
-    if (dist(pk.x, pk.y, G.player.x, G.player.y) < 30) {
-      pk.taken = true;
-      if (pk.kind === 'pistol') {
-        G.hasPistol = true;
-        say('Pistol picked up. Click to shoot — and try not to need it.', 'Jax Marlow');
-      } else if (pk.kind === 'health') {
-        G.player.health = Math.min(100, G.player.health + 40);
-        say('Patched up. Good as new.', 'Jax Marlow');
-      } else if (pk.kind === 'cash') {
-        G.cash += 50;
-        AudioSys.cash();
-      }
-      AudioSys.pickup();
-      spawnParticles(pk.x, pk.y, 10, '#7CFC98');
-    }
-  }
-  G.pickups = G.pickups.filter((p) => !p.taken);
-}
-
-function spawnPickup(kind, x, y) {
-  G.pickups.push({ kind, x, y, bob: 0, taken: false });
-}
-
-function drawBullets(c) {
-  c.save();
-  c.strokeStyle = '#ffe9a8';
-  c.lineWidth = 3;
-  for (const b of G.bullets) {
-    c.beginPath();
-    c.moveTo(b.x - b.vx * 0.02, b.y - b.vy * 0.02);
-    c.lineTo(b.x, b.y);
-    c.stroke();
-  }
-  c.restore();
 }

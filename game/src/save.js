@@ -1,41 +1,57 @@
-// Solmara Nights — save system (localStorage): cash, story progress,
-// health, pistol, position and clock. Continue appears on the start screen.
+// Solmara Nights — save and load through localStorage.
+// One clear job: persist cash, progress and position; restore them on Continue.
+import { SAVE_KEY } from './config.js';
 
-function saveGame() {
-  if (!G) return;
+export function saveGame(S) {
   try {
     const data = {
-      cash: Math.round(G.cash),
-      missionIndex: G.missionIndex,
-      health: Math.round(G.player.health),
-      hasPistol: G.hasPistol,
-      x: Math.round(G.player.x),
-      y: Math.round(G.player.y),
-      clockMin: Math.round(G.clockMin),
-      wanted: G.wanted,
+      cash: S.cash,
+      health: S.health,
+      missionIndex: S.missionIndex,
+      reputation: S.reputation,
+      x: S.player.x,
+      y: S.player.y,
+      clock: S.clock,
+      stats: S.stats,
+      savedAt: Date.now(),
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-  } catch (err) {
-    // Private mode or no storage: the game still plays, it just won't save.
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    S.saveExists = true;
+    return true;
+  } catch (e) {
+    return false;
   }
 }
 
-function loadSaveData() {
+export function loadSave() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = window.localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (typeof data.cash !== 'number') return null;
-    return data;
-  } catch (err) {
+    return JSON.parse(raw);
+  } catch (e) {
     return null;
   }
 }
 
-function hasSave() {
-  return loadSaveData() !== null;
+export function applySave(S, data) {
+  if (!data) return false;
+  S.cash = data.cash || 0;
+  S.health = data.health || 100;
+  S.missionIndex = data.missionIndex || 0;
+  S.reputation = data.reputation || 0;
+  S.player.x = data.x || S.player.x;
+  S.player.y = data.y || S.player.y;
+  S.clock = data.clock || 17.2;
+  if (data.stats) S.stats = data.stats;
+  S.camera.x = S.player.x;
+  S.camera.y = S.player.y;
+  return true;
 }
 
-function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
+export function hasSave() {
+  try {
+    return !!window.localStorage.getItem(SAVE_KEY);
+  } catch (e) {
+    return false;
+  }
 }

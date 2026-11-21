@@ -1,54 +1,66 @@
-// Solmara Nights — keyboard and mouse input, with per-frame edge detection.
+// Solmara Nights — keyboard and mouse input.
+// One clear job: turn browser events into a plain state the game reads each tick.
+export function createInput(canvas) {
+  const input = {
+    up: false, down: false, left: false, right: false,
+    run: false, handbrake: false,
+    mouseX: 0, mouseY: 0, mouseDown: false, mouseClicked: false,
+    pressed: {}, // keys pressed since last tick (edge-triggered)
+  };
 
-const Keys = {
-  down: {},
-  just: {},
-  mouseX: 640,
-  mouseY: 360,
-  mouseDown: false,
-  mouseClicked: false,
+  function keyName(e) {
+    const k = e.key.toLowerCase();
+    if (k === 'arrowup' || k === 'w') return 'up';
+    if (k === 'arrowdown' || k === 's') return 'down';
+    if (k === 'arrowleft' || k === 'a') return 'left';
+    if (k === 'arrowright' || k === 'd') return 'right';
+    return k;
+  }
 
-  init(canvas) {
-    window.addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
-      if (!Keys.down[e.code]) Keys.just[e.code] = true;
-      Keys.down[e.code] = true;
-      AudioSys.init(); AudioSys.resume();
-    });
-    window.addEventListener('keyup', (e) => { Keys.down[e.code] = false; });
-    window.addEventListener('blur', () => { Keys.down = {}; });
-    canvas.addEventListener('mousemove', (e) => {
-      const r = canvas.getBoundingClientRect();
-      Keys.mouseX = (e.clientX - r.left) * (canvas.width / r.width);
-      Keys.mouseY = (e.clientY - r.top) * (canvas.height / r.height);
-    });
-    canvas.addEventListener('mousedown', (e) => {
-      Keys.mouseDown = true; Keys.mouseClicked = true;
-      AudioSys.init(); AudioSys.resume();
-    });
-    window.addEventListener('mouseup', () => { Keys.mouseDown = false; });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  },
+  window.addEventListener('keydown', (e) => {
+    const k = keyName(e);
+    if (['up', 'down', 'left', 'right', ' '].includes(k) || e.key === ' ') e.preventDefault();
+    if (k === 'up') input.up = true;
+    else if (k === 'down') input.down = true;
+    else if (k === 'left') input.left = true;
+    else if (k === 'right') input.right = true;
+    else if (k === 'shift') input.run = true;
+    else if (k === ' ') input.handbrake = true;
+    else input.pressed[k] = true;
+  });
 
-  pressed(code) {
-    return !!Keys.just[code];
-  },
+  window.addEventListener('keyup', (e) => {
+    const k = keyName(e);
+    if (k === 'up') input.up = false;
+    else if (k === 'down') input.down = false;
+    else if (k === 'left') input.left = false;
+    else if (k === 'right') input.right = false;
+    else if (k === 'shift') input.run = false;
+    else if (k === ' ') input.handbrake = false;
+  });
 
-  held(code) {
-    return !!Keys.down[code];
-  },
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    input.mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    input.mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+  });
 
-  axis() {
-    let x = 0, y = 0;
-    if (Keys.down['KeyA'] || Keys.down['ArrowLeft']) x -= 1;
-    if (Keys.down['KeyD'] || Keys.down['ArrowRight']) x += 1;
-    if (Keys.down['KeyW'] || Keys.down['ArrowUp']) y -= 1;
-    if (Keys.down['KeyS'] || Keys.down['ArrowDown']) y += 1;
-    return { x, y };
-  },
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) { input.mouseDown = true; input.mouseClicked = true; }
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) input.mouseDown = false;
+  });
 
-  endFrame() {
-    Keys.just = {};
-    Keys.mouseClicked = false;
-  },
-};
+  // Edge-triggered keys are consumed once per tick by the game loop.
+  input.consume = function (k) {
+    if (input.pressed[k]) { input.pressed[k] = false; return true; }
+    return false;
+  };
+  input.clearPressed = function () {
+    input.pressed = {};
+    input.mouseClicked = false;
+  };
+
+  return input;
+}

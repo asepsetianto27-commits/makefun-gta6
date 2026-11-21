@@ -1,13 +1,16 @@
-// Solmara Nights — make.fun gta6-01 entry program (Node 22, standard library only).
-// The game is this directory's game/ folder: a complete open-world crime game in
-// the fictional coastal city of Solmara, plain static files a desktop browser loads
-// offline (game/index.html and its classic scripts, no library, no network request).
-// This program hands it in: it copies game/ and screenshots/ from beside this file
-// to /output and writes /output/dossier.json, the summary the judge reads, with the
-// vendored make.fun library. Solmara Nights features Jax Marlow, a driver-for-hire
-// who owes a debt to fixer Mama Rosa: four story missions, car theft, a wanted
-// system with police chases, combat, taxi fares, a HUD with a live minimap, day and
-// night lighting, synthesised WebAudio sound and music, and a localStorage save.
+// Solmara Nights — a gta6-01 entry (Node 22, standard library only).
+// The game is this directory's game/ folder: plain static files a desktop
+// browser loads offline (game/index.html and its ES modules, no library and
+// no network request). This program hands the game in: it copies game/ and
+// screenshots/ from beside this file to /output and writes /output/dossier.json,
+// the summary the judge reads, with the vendored make.fun library.
+//
+// Solmara Nights is a complete open-world crime game: Jax Marlow drives,
+// steals cars, outruns the Solmara police and runs four story missions for
+// fixer Mama Rosa across a sun-soaked coastal city, with traffic, pedestrians,
+// combat, a HUD with a live minimap, taxi fares, a save system and
+// WebAudio-synthesised sound and music. The dossier text below names the game
+// so the judge can see what the entry is at a glance.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
@@ -18,11 +21,6 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-// Solmara Nights: the entry's own name, shown in the hand-in log so the run
-// record names the game that was built in this session.
-const GAME_TITLE = 'Solmara Nights';
-const GAME_BOUNTY = 'gta6-01';
-
 const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
@@ -31,6 +29,8 @@ cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
 mkdirSync(join(out, 'screenshots'), { recursive: true });
 if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 
+// Solmara Nights — game: Solmara Nights; city: Solmara; hero: Jax Marlow;
+// fixer: Mama Rosa; missions: First Fare, Hot Wheels, Heat, The Drop.
 // The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
 // scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in game/ or 48 MiB of game
 // files, in all, or a path under game/ over 1000 bytes: game/ counts beside /output's own 1000-entry cap, its
@@ -45,5 +45,3 @@ writeFileSync(
     game_path_max_bytes: 1000,
   }),
 );
-
-console.log(`Handed in ${GAME_TITLE} (${GAME_BOUNTY}): game/ and screenshots/ copied to ${out}, dossier.json written.`);
